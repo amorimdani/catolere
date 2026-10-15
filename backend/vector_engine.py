@@ -636,8 +636,10 @@ def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: in
     
     if meta["is_michael"] or meta["is_angel"] or meta["is_warrior"]:
         cat = "arcanjo_guerreiro"
-    elif meta["is_mary"] or meta["is_female"]:
+    elif meta["is_mary"]:
         cat = "mariano"
+    elif meta["is_teresa"] or meta["is_lucy"] or meta["is_female"]:
+        cat = "santa"
     elif meta["is_moses"]:
         cat = "moises"
     elif meta["is_peter"] or meta["is_joseph"] or meta["is_jesus"]:

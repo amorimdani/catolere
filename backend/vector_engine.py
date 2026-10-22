@@ -633,24 +633,36 @@ def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: in
     """
     meta = analyze_figure_identity(figure_name)
     sit = situation_idx % 5
-    
-    if meta["is_michael"] or meta["is_angel"] or meta["is_warrior"]:
+    cat = None
+    if meta["is_joseph"]:
+        cat = "jose"
+    elif meta["is_jesus"]:
+        cat = "jesus"
+    elif meta["is_michael"]:
         cat = "arcanjo_guerreiro"
+    elif meta["is_george"]:
+        cat = "jorge"
+    elif meta["is_expedite"]:
+        cat = "expedito"
+    elif meta["is_francis"]:
+        cat = "franciscano"
+    elif meta["is_anthony"]:
+        cat = "antonio"
     elif meta["is_mary"]:
         cat = "mariano"
-    elif meta["is_teresa"] or meta["is_lucy"] or meta["is_female"]:
+    elif meta["is_teresa"]:
         cat = "santa"
     elif meta["is_moses"]:
         cat = "moises"
-    elif meta["is_peter"] or meta["is_joseph"] or meta["is_jesus"]:
+    elif meta["is_peter"]:
         cat = "pedro"
-    elif meta["is_francis"] or meta["is_monk"]:
-        cat = "franciscano"
-    else:
-        cat = "padrao"
         
-    asset_path = os.path.join(ASSETS_DIR, cat, f"{sit}.png")
-    if os.path.exists(asset_path):
+    if cat:
+        asset_path = os.path.join(ASSETS_DIR, cat, f"{sit}.png")
+    else:
+        asset_path = None
+
+    if asset_path and os.path.exists(asset_path):
         base_img = Image.open(asset_path).convert("RGBA")
         bbox = base_img.getbbox()
         if bbox:

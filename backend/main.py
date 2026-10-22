@@ -106,6 +106,24 @@ def generate_dynamic_profile(figure_name: str) -> dict:
             f"Acolhendo e protegendo as famílias sob suas asas luminosas",
             f"Ensinando os caminhos da fé com o sagrado pergaminho dos Céus"
         ]
+    elif meta["is_george"]:
+        title = f"{figure_name} — Soldado Valoroso de Cristo e Vencedor do Dragão"
+        situations = [
+            f"Em oração fervorosa buscando a fortaleza de Deus antes da batalha da fé",
+            f"Caminhando com coragem e determinação empunhando seu estandarte com a Cruz Vermelha",
+            f"Sorrindo com serenidade e abençoando o povo com seu manto de cavaleiro",
+            f"Vencendo o dragão e defendendo os oprimidos com sua lança milagrosa",
+            f"Testemunhando a fé com perseverança e transmitindo a Palavra de Deus"
+        ]
+    elif meta["is_expedite"]:
+        title = f"{figure_name} — Santo das Causas Urgentes e Mártir da Fé"
+        situations = [
+            f"Em oração vigilante pedindo a graça e a urgência do amor divino",
+            f"Caminhando resoluto com vestes romanas proclamando a fé em Cristo",
+            f"Sorrindo com esperança e trazendo o amparo nas aflições",
+            f"Erguendo a Cruz da Esperança com a palavra 'HODIE' e vencendo as dúvidas",
+            f"Ensinando a não adiar o bem e a servir a Deus com prontidão"
+        ]
     elif meta["is_warrior"]:
         title = f"{figure_name} — Guerreiro da Fé e Soldado de Cristo"
         situations = [
@@ -123,6 +141,15 @@ def generate_dynamic_profile(figure_name: str) -> dict:
             f"Sorrindo com afeto fraternal e abençoando toda a criação com a pomba da paz",
             f"Ajudando os necessitados partilhando o pão com generosidade e compaixão",
             f"Pregando e ensinando o Cântico das Criaturas aos pássaros e irmãos da natureza"
+        ]
+    elif meta["is_anthony"]:
+        title = f"{figure_name} — Doutor Evangélico e Amigo dos Pobres"
+        situations = [
+            f"Em oração contemplativa e íntima comunhão com as Sagradas Escrituras",
+            f"Caminhando com humildade segurando lírios de pureza e paz",
+            f"Sorrindo com ternura e acolhendo os aflitos e devotos",
+            f"Abençoando as famílias e partilhando o Pão de Santo Antônio com os necessitados",
+            f"Pregando com profunda sabedoria a Boa Nova do Evangelho"
         ]
     elif meta["is_mary"]:
         title = f"{figure_name} — Mãe de Misericórdia e Rainha Celestial"

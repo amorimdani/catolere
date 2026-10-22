@@ -657,10 +657,17 @@ def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: in
     elif meta["is_peter"]:
         cat = "pedro"
         
-    if cat:
-        asset_path = os.path.join(ASSETS_DIR, cat, f"{sit}.png")
-    else:
-        asset_path = None
+    if not cat or not os.path.exists(os.path.join(ASSETS_DIR, cat, f"{sit}.png")):
+        if meta.get("is_female"):
+            cat = "mariano"
+        elif meta.get("is_angel") or meta.get("is_warrior"):
+            cat = "arcanjo_guerreiro"
+        elif meta.get("is_monk"):
+            cat = "franciscano"
+        else:
+            cat = "padrao"
+            
+    asset_path = os.path.join(ASSETS_DIR, cat, f"{sit}.png")
 
     if asset_path and os.path.exists(asset_path):
         base_img = Image.open(asset_path).convert("RGBA")

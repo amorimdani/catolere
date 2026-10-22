@@ -624,13 +624,89 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
 
     return img
 
+import urllib.parse
+import urllib.request
+import io
+import numpy as np
+
+def convert_to_transparent_lineart(img_input, target_size=1024, margin=75) -> Image.Image:
+    """Converte line-art gerada por IA (fundo branco) em PNG 100% transparente com traços pretos nítidos."""
+    if isinstance(img_input, bytes):
+        img = Image.open(io.BytesIO(img_input)).convert('L')
+    elif isinstance(img_input, Image.Image):
+        img = img_input.convert('L')
+    else:
+        img = Image.open(img_input).convert('L')
+
+    arr = np.array(img, dtype=np.float32)
+    low_thresh = 45.0
+    high_thresh = 220.0
+    
+    alpha = (high_thresh - arr) / (high_thresh - low_thresh) * 255.0
+    alpha = np.clip(alpha, 0, 255).astype(np.uint8)
+    
+    r = np.zeros_like(alpha)
+    g = np.zeros_like(alpha)
+    b = np.zeros_like(alpha)
+    
+    rgba = np.stack([r, g, b, alpha], axis=-1)
+    result = Image.fromarray(rgba, mode='RGBA')
+    
+    bbox = result.getbbox()
+    if bbox:
+        cropped = result.crop(bbox)
+        cw, ch = cropped.size
+        max_dim = target_size - (margin * 2)
+        scale = min(max_dim / cw, max_dim / ch)
+        nw, nh = max(1, int(cw * scale)), max(1, int(ch * scale))
+        resized = cropped.resize((nw, nh), Image.Resampling.LANCZOS)
+        
+        canvas = Image.new('RGBA', (target_size, target_size), (0, 0, 0, 0))
+        px = (target_size - nw) // 2
+        py = (target_size - nh) // 2
+        canvas.paste(resized, (px, py), mask=resized)
+        return canvas
+    return result
+
+def fetch_pollinations_ai(prompt: str, seed: int) -> Image.Image:
+    """Tenta gerar imagem via Pollinations.ai (Flux/Turbo) e converter para canal alfa."""
+    try:
+        clean_prompt = f"Children coloring book page of {prompt}, cute storybook style, thick clean uniform black outlines, coloring page for kids, pure white background, no shading, no gradients, line art"
+        encoded = urllib.parse.quote(clean_prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&seed={seed}&nologo=true"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://pollinations.ai/"
+        }
+        api_key = os.getenv("POLLINATIONS_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=18) as resp:
+            data = resp.read()
+            if len(data) > 1000:
+                return convert_to_transparent_lineart(data)
+    except Exception as e:
+        # Fallback silencioso para acervo em caso de timeout ou rate-limit
+        pass
+    return None
+
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
-def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: int) -> Image.Image:
+def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: int, custom_prompt: str = "") -> Image.Image:
     """
-    Renderiza arte de colorir 1024x1024 profissional, rica em traços pretos expressivos (storybook / 2D lineart),
-    fundo 100% transparente (canal alfa limpo) e margem de segurança garantida (zero cortes).
+    Renderiza arte de colorir 1024x1024 profissional com traço preto e fundo 100% transparente.
+    Tenta via Pollinations.ai (geração dinâmica de IA); em caso de limite/offline, usa acervo vetorial de alta definição.
     """
+    # 1. Tentativa com IA (Pollinations.ai)
+    query_prompt = custom_prompt or f"{figure_name} cena #{situation_idx+1}"
+    ai_result = fetch_pollinations_ai(query_prompt, seed)
+    if ai_result is not None:
+        return ai_result
+
+    # 2. Pipeline de Acervo Artístico com variação geométrica segura
+
     meta = analyze_figure_identity(figure_name)
     sit = situation_idx % 5
     cat = None

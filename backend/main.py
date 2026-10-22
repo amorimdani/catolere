@@ -245,7 +245,7 @@ def generate_coloring_pages(req: GenerateRequest):
         logger.info(f"Gerando arte vetorial padronizada: {profile['name']} [{saint_code}] | Cena #{i+1}")
         
         # Gera arte vetorial com auto-padding garantido de 70px e fundo 100% alfa
-        transparent_img = render_detailed_coloring_page(figure_name, i, seed)
+        transparent_img = render_detailed_coloring_page(figure_name, i, seed, custom_prompt=prompt)
         
         # Converte para PNG Base64
         buffered = io.BytesIO()

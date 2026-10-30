@@ -125,6 +125,15 @@ def generate_dynamic_profile(figure_name: str) -> dict:
             f"Erguendo a Cruz da Esperança com a palavra 'HODIE' e vencendo as dúvidas",
             f"Ensinando a não adiar o bem e a servir a Deus com prontidão"
         ]
+    elif meta["is_sebastian"]:
+        title = f"{figure_name} — Soldado Fiel de Cristo e Mártir Invencível da Fé"
+        situations = [
+            f"Atado ao tronco da oliveira em oração serena e inabalável fidelidade a Deus",
+            f"Testemunhando a fortaleza cristã e coragem com olhar elevado aos Céus",
+            f"Sorrindo com a paz da graça divina sob a proteção e amparo dos santos anjos",
+            f"Sustentando a palma gloriosa do martírio e a coroa celestial da vitória",
+            f"Abençoando os devotos e livrando as famílias contra as pestes e perigos"
+        ]
     elif meta["is_warrior"]:
         title = f"{figure_name} — Guerreiro da Fé e Soldado de Cristo"
         situations = [

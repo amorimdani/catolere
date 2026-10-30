@@ -3,23 +3,30 @@ import math
 import random
 import hashlib
 import io
+import unicodedata
 import urllib.parse
 import urllib.request
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
+def normalize_text(text: str) -> str:
+    nfkd = unicodedata.normalize('NFKD', text)
+    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower().strip()
+
 def analyze_figure_identity(figure_name: str) -> dict:
-    nl = figure_name.lower().strip()
+    raw_nl = figure_name.lower().strip()
+    norm_nl = normalize_text(figure_name)
+    nl = f"{raw_nl} {norm_nl}"
     
-    is_michael = any(k in nl for k in ["miguel", "arcanjo são miguel", "sao miguel", "são miguel"])
+    is_michael = any(k in nl for k in ["miguel", "arcanjo sao miguel", "sao miguel"])
     is_gabriel = any(k in nl for k in ["gabriel"])
-    is_raphael = any(k in nl for k in ["rafael"])
+    is_raphael = any(k in nl for k in ["rafael", "raphael"])
     is_angel = is_michael or is_gabriel or is_raphael or any(k in nl for k in ["arcanjo", "anjo", "querubim", "serafim"])
     
     is_george = any(k in nl for k in ["jorge"])
     is_expedite = any(k in nl for k in ["expedito"])
-    is_sebastian = any(k in nl for k in ["sebastião", "sebastiao"])
-    is_warrior = is_michael or is_george or is_expedite or is_sebastian or any(k in nl for k in ["soldado", "guerreiro"])
+    is_sebastian = any(k in nl for k in ["sebastiao", "sebastian", "sebast"])
+    is_warrior = is_michael or is_george or is_expedite or any(k in nl for k in ["soldado", "guerreiro"])
     
     is_francis = any(k in nl for k in ["francisc", "chico", "assis"])
     is_anthony = any(k in nl for k in ["antonio", "antônio"])
@@ -686,6 +693,8 @@ def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: in
     # Mapeamento iconográfico estrito por figura
     if meta.get("is_philomena"):
         cat = "filomena"
+    elif meta.get("is_sebastian"):
+        cat = "sebastiao"
     elif meta.get("is_joseph"):
         cat = "jose"
     elif meta.get("is_jesus"):

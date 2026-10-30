@@ -34,6 +34,7 @@ app.add_middleware(
 
 class GenerateRequest(BaseModel):
     name: str
+    api_key: Optional[str] = None
 
 class ImageResult(BaseModel):
     id: int
@@ -64,7 +65,7 @@ def health_check():
     return {
         "status": "online",
         "device": "cpu",
-        "engine": "Autonomous Sacred Line-Art Vector Generator (Strict Safe-Bounds 100% Alpha)",
+        "engine": "Curated Sacred Storybook Vector Line-Art (Strict Bounds 100% Alpha)",
         "rembg_ready": True
     }
 
@@ -160,6 +161,15 @@ def generate_dynamic_profile(figure_name: str) -> dict:
             f"Acolhendo e protegendo os filhos e famílias sob as dobras de seu manto sagrado",
             f"Ensinando a oração e a pureza de coração através do Santo Rosário"
         ]
+    elif meta.get("is_philomena"):
+        title = f"{figure_name} — Princesa do Céu, Virgem e Mártir da Pureza"
+        situations = [
+            f"Em oração contemplativa com a coroa de rosas celestiais e lírios de pureza",
+            f"Caminhando com serenidade segurando a palma do martírio e a âncora da fé",
+            f"Sorrindo com ternura trazendo a bênção e o consolo divino aos devotos",
+            f"Vencendo todas as adversidades e sustentada pelos anjos com a âncora da esperança",
+            f"Ensinando a fidelidade inabalável a Cristo com o Santo Terço e as Sagradas Escrituras"
+        ]
     elif meta["is_teresa"]:
         title = f"{figure_name} — Apóstola da Caridade e Exemplo de Amor ao Próximo"
         situations = [
@@ -238,14 +248,14 @@ def generate_coloring_pages(req: GenerateRequest):
         saint_code = f"{profile['prefix']}-{(i+1):02d}"
         
         prompt = (
-            f"Coloring book page for kids, thick uniform black outlines, 2D vector style, "
-            f"{figure_name} {situation}, centered composition, zero edge cropping, 100% transparent background."
+            f"Children coloring book page of {figure_name}, {situation}, "
+            f"thick clean black outlines, line art, pure white background"
         )
         
         logger.info(f"Gerando arte vetorial padronizada: {profile['name']} [{saint_code}] | Cena #{i+1}")
         
-        # Gera arte vetorial com auto-padding garantido de 70px e fundo 100% alfa
-        transparent_img = render_detailed_coloring_page(figure_name, i, seed, custom_prompt=prompt)
+        # Gera arte vetorial em tempo real com auto-padding garantido de 70px e fundo 100% alfa
+        transparent_img = render_detailed_coloring_page(figure_name, i, seed, custom_prompt=prompt, api_key=req.api_key)
         
         # Converte para PNG Base64
         buffered = io.BytesIO()

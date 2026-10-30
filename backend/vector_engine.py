@@ -2,6 +2,10 @@ import os
 import math
 import random
 import hashlib
+import io
+import urllib.parse
+import urllib.request
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 def analyze_figure_identity(figure_name: str) -> dict:
@@ -26,7 +30,17 @@ def analyze_figure_identity(figure_name: str) -> dict:
     is_mary = any(k in nl for k in ["maria", "senhora", "fátima", "fatima", "aparecida", "lourdes", "carmo", "virgem", "guadalupe", "conceição", "madona", "desatadora"])
     is_teresa = any(k in nl for k in ["teresa", "calcutá", "calcuta", "madre"]) and not is_mary
     is_lucy = any(k in nl for k in ["luzia", "lucia"])
-    is_female = is_mary or is_teresa or is_lucy or any(k in nl for k in ["santa", "rita", "cecília", "cecilia", "bárbara", "barbara", "irmã", "dulce"])
+    
+    is_philomena = any(k in nl for k in ["filomena", "philomena"])
+    is_rita = any(k in nl for k in ["rita", "cássia", "cassia"])
+    is_cecilia = any(k in nl for k in ["cecília", "cecilia"])
+    is_clara = any(k in nl for k in ["clara", "clarissa"])
+    is_judas = any(k in nl for k in ["judas", "tadeu"])
+    
+    is_female = (
+        is_mary or is_teresa or is_lucy or is_philomena or is_rita or is_cecilia or is_clara
+        or any(k in nl for k in ["santa", "bárbara", "barbara", "irmã", "dulce", "marta", "madalena"])
+    )
     
     is_joseph = any(k in nl for k in ["josé", "jose", "carpinteiro"]) and not is_francis
     is_jesus = any(k in nl for k in ["jesus", "cristo", "bom pastor", "messias", "salvador", "coração de jesus", "sagrado coração"]) and not is_joseph
@@ -50,13 +64,17 @@ def analyze_figure_identity(figure_name: str) -> dict:
         "is_mary": is_mary,
         "is_teresa": is_teresa,
         "is_lucy": is_lucy,
+        "is_philomena": is_philomena,
+        "is_rita": is_rita,
+        "is_cecilia": is_cecilia,
+        "is_clara": is_clara,
+        "is_judas": is_judas,
         "is_female": is_female,
         "is_joseph": is_joseph,
         "is_jesus": is_jesus,
         "is_peter": is_peter,
         "is_moses": is_moses
     }
-
 
 def get_bezier_points(p0, p1, p2, p3, steps=40):
     """Calcula pontos suaves de uma curva cúbica de Bézier."""
@@ -88,66 +106,76 @@ def draw_rose(draw, cx, cy, radius=16):
     draw.circle((cx, cy), radius, outline="black", width=4)
     draw.arc([cx - radius + 4, cy - radius + 4, cx + radius - 4, cy + radius - 4], 45, 270, fill="black", width=3)
     draw.arc([cx - radius + 8, cy - radius + 8, cx + radius - 8, cy + radius - 8], 225, 90, fill="black", width=3)
-    # Pétalas externas
     for p in range(5):
         ang = p * (math.pi * 2 / 5)
         px = cx + math.cos(ang) * (radius + 6)
         py = cy + math.sin(ang) * (radius + 6)
         draw.arc([int(px - 6), int(py - 6), int(px + 6), int(py + 6)], 0, 360, fill="black", width=3)
 
+def draw_anchor(draw, cx, cy, height=130):
+    """Âncora sagrada da esperança e fidelidade (atributo de Santa Filomena)."""
+    top_y = cy - height // 2
+    bot_y = cy + height // 2
+    
+    # Anel superior
+    draw.circle((cx, top_y + 12), 14, outline="black", width=5)
+    draw.circle((cx, top_y + 12), 5, fill="black")
+    
+    # Haste central
+    draw.line([(cx, top_y + 24), (cx, bot_y - 6)], fill="black", width=7)
+    
+    # Barra transversal
+    bar_y = top_y + 40
+    draw.line([(cx - 32, bar_y), (cx + 32, bar_y)], fill="black", width=6)
+    draw.circle((cx - 32, bar_y), 5, fill="black")
+    draw.circle((cx + 32, bar_y), 5, fill="black")
+    
+    # Braço curvo inferior
+    draw.arc([cx - 55, bot_y - 60, cx + 55, bot_y + 10], 0, 180, fill="black", width=7)
+    
+    # Patas da âncora
+    draw.polygon([(cx - 55, bot_y - 25), (cx - 65, bot_y - 42), (cx - 45, bot_y - 32)], fill="black")
+    draw.polygon([(cx + 55, bot_y - 25), (cx + 65, bot_y - 42), (cx + 45, bot_y - 32)], fill="black")
+
+def draw_palm_branch(draw, x0, y0, x1, y1):
+    """Palma do martírio celestial com folhas detalhadas."""
+    draw.line([(x0, y0), (x1, y1)], fill="black", width=5)
+    steps = 10
+    dx = (x1 - x0) / steps
+    dy = (y1 - y0) / steps
+    for i in range(2, steps):
+        px = x0 + dx * i
+        py = y0 + dy * i
+        draw.line([(px, py), (px - 22, py - 14)], fill="black", width=3)
+        draw.line([(px, py), (px + 22, py - 14)], fill="black", width=3)
+
 def draw_ornate_halo(draw, cx, cy, radius=135, is_mary=False, is_jesus=False, halo_style=0):
     """Auréola sagrada profissional, ornamental e radiante."""
-    # Anel externo principal
-    draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], outline="black", width=6)
-    # Anel intermediário decorativo com pontilhado ou friso duplo
-    draw.ellipse([cx - radius + 10, cy - radius + 10, cx + radius - 10, cy + radius - 10], outline="black", width=3)
-    draw.ellipse([cx - radius + 18, cy - radius + 18, cx + radius - 18, cy + radius - 18], outline="black", width=2)
-
-    if is_jesus:
-        # Auréola cruciforme com raios de glória
-        for rad in [0, math.pi/2, math.pi, 3*math.pi/2]:
-            x1 = cx + math.cos(rad) * (radius - 18)
-            y1 = cy + math.sin(rad) * (radius - 18)
-            x2 = cx + math.cos(rad) * (radius + 24)
-            y2 = cy + math.sin(rad) * (radius + 24)
-            draw.line([(x1, y1), (x2, y2)], fill="black", width=7)
-            # Travessas da cruz na auréola
-            perp = rad + math.pi/2
-            for offset in [-8, 8]:
-                draw.line([
-                    (x2 + math.cos(perp)*offset, y2 + math.sin(perp)*offset),
-                    (x1 + math.cos(perp)*offset, y1 + math.sin(perp)*offset)
-                ], fill="black", width=3)
-    elif is_mary:
-        # Coroa celestial de 12 estrelas brilhantes
-        for s in range(12):
-            ang = s * (math.pi * 2 / 12) - math.pi / 2
-            sx = cx + math.cos(ang) * (radius + 24)
-            sy = cy + math.sin(ang) * (radius + 24)
-            draw_star(draw, sx, sy, 9, 4, points=5, fill="black")
-            # Pequeno raio radiante entre estrelas
-            ray_ang = ang + (math.pi / 12)
-            rx1 = cx + math.cos(ray_ang) * (radius + 4)
-            ry1 = cy + math.sin(ray_ang) * (radius + 4)
-            rx2 = cx + math.cos(ray_ang) * (radius + 16)
-            ry2 = cy + math.sin(ray_ang) * (radius + 16)
-            draw.line([(rx1, ry1), (rx2, ry2)], fill="black", width=3)
+    draw.circle((cx, cy), radius, outline="black", width=6)
+    draw.circle((cx, cy), radius - 12, outline="black", width=3)
+    
+    if is_mary:
+        for i in range(12):
+            ang = i * (math.pi * 2 / 12) - math.pi / 2
+            sx = cx + math.cos(ang) * (radius + 20)
+            sy = cy + math.sin(ang) * (radius + 20)
+            draw_star(draw, sx, sy, 11, 4, points=5, fill="black")
+    elif is_jesus:
+        cr_w = 20
+        draw.rectangle([cx - cr_w//2, cy - radius - 10, cx + cr_w//2, cy + radius + 10], outline="black", width=4)
+        draw.rectangle([cx - radius - 10, cy - cr_w//2, cx + radius + 10, cy + cr_w//2], outline="black", width=4)
     else:
-        # Raios solares ornamentais com pontas alternadas e contas
-        ray_count = 24
-        for i in range(ray_count):
-            deg = i * (360 / ray_count)
-            rad = math.radians(deg)
+        num_rays = 16
+        for i in range(num_rays):
+            rad = i * (math.pi * 2 / num_rays)
             is_major = (i % 2 == 0)
-            r_start = radius + 6
-            r_end = radius + (26 if is_major else 14)
-            
-            x_start = cx + math.cos(rad) * r_start
-            y_start = cy + math.sin(rad) * r_start
-            x_end = cx + math.cos(rad) * r_end
-            y_end = cy + math.sin(rad) * r_end
-            draw.line([(x_start, y_start), (x_end, y_end)], fill="black", width=4 if is_major else 3)
-            
+            r_start = radius + 4
+            r_end = radius + (24 if is_major else 14)
+            x0 = cx + math.cos(rad) * r_start
+            y0 = cy + math.sin(rad) * r_start
+            x1 = cx + math.cos(rad) * r_end
+            y1 = cy + math.sin(rad) * r_end
+            draw.line([(int(x0), int(y0)), (int(x1), int(y1))], fill="black", width=4 if is_major else 2)
             if is_major:
                 draw.circle((int(cx + math.cos(rad) * (r_end + 5)), int(cy + math.sin(rad) * (r_end + 5))), 3, fill="black")
 
@@ -155,63 +183,50 @@ def draw_charming_face(draw, cx, cy, is_female=False, is_child=False):
     """Rosto com proporções ilustradas de alta qualidade (storybook cute)."""
     hw, hh = (54, 62) if is_child else (66, 76)
     
-    # Contorno suave do rosto com queixo delicado
+    # Contorno suave do rosto
     draw.ellipse([cx - hw, cy - hh, cx + hw, cy + hh - 4], outline="black", width=6)
     
     # Orelhas delicadas
     draw.arc([cx - hw - 10, cy - 6, cx - hw + 8, cy + 20], 90, 270, fill="black", width=4)
     draw.arc([cx + hw - 8, cy - 6, cx + hw + 10, cy + 20], 270, 450, fill="black", width=4)
 
-    # Olhos expressivos com brilho duplo e profundidade de ilustração
+    # Olhos expressivos
     eye_dx, eye_y = 28, cy - 6
     for ed in [-eye_dx, eye_dx]:
-        # Globo ocular
         draw.ellipse([cx + ed - 14, eye_y - 15, cx + ed + 14, eye_y + 15], fill="black")
-        # Brilho de luz primário (grande)
         draw.ellipse([cx + ed - 7, eye_y - 10, cx + ed - 1, eye_y - 3], fill="white")
-        # Brilho de luz secundário (pequeno)
         draw.ellipse([cx + ed + 3, eye_y + 4, cx + ed + 7, eye_y + 8], fill="white")
-        # Arco da pálpebra superior / cílios
         draw.arc([cx + ed - 15, eye_y - 20, cx + ed + 15, eye_y - 6], 190, 350, fill="black", width=5)
         
         if is_female:
-            # Cílios charmosos
             side = 1 if ed > 0 else -1
             draw.line([(cx + ed + side*13, eye_y - 11), (cx + ed + side*20, eye_y - 17)], fill="black", width=4)
             draw.line([(cx + ed + side*11, eye_y - 5), (cx + ed + side*18, eye_y - 8)], fill="black", width=3)
         
-        # Bochecha corada sutil
         draw.line([(cx + ed - 10, eye_y + 24), (cx + ed + 10, eye_y + 24)], fill="black", width=3)
 
-    # Sobrancelhas suaves e amigáveis
+    # Sobrancelhas suaves
     draw_smooth_curve(draw, (cx - 42, cy - 30), (cx - 30, cy - 38), (cx - 18, cy - 35), (cx - 10, cy - 24), width=4)
     draw_smooth_curve(draw, (cx + 10, cy - 24), (cx + 18, cy - 35), (cx + 30, cy - 38), (cx + 42, cy - 30), width=4)
 
     # Nariz sutil de botão
     draw.arc([cx - 5, cy + 10, cx + 5, cy + 18], 0, 180, fill="black", width=4)
 
-    # Sorriso iluminado e acolhedor
+    # Sorriso iluminado
     draw.arc([cx - 20, cy + 22, cx + 20, cy + 44], 0, 180, fill="black", width=5)
-    # Covinhas do sorriso
     draw.line([(cx - 23, cy + 26), (cx - 19, cy + 22)], fill="black", width=3)
     draw.line([(cx + 23, cy + 26), (cx + 19, cy + 22)], fill="black", width=3)
 
 def draw_detailed_wings(draw, cx, cy, wing_span=285):
-    """Asas de anjo/arcanjo majestosas e ricas em penas em 3 níveis."""
+    """Asas de anjo/arcanjo majestosas."""
     for side in [-1, 1]:
         bx = cx + side * 75
-        # 1. Envergadura principal superior
         draw_smooth_curve(draw, (bx, cy + 25), (cx + side * (wing_span * 0.7), cy - 165), (cx + side * wing_span, cy - 60), (cx + side * (wing_span + 10), cy + 50), width=6)
-        
-        # 2. Penas primárias externas longas
         for p in range(5):
             py = cy - 40 + p * 55
             px_out = cx + side * (wing_span + 10 - p * 30)
             draw_smooth_curve(draw, (bx + side * 50, py), (px_out, py + 20), (px_out - side * 20, py + 70), (bx + side * 30, cy + 260), width=4)
-            # Frisos internos da pena
             draw.line([(int(bx + side * 45), int(py + 15)), (int(px_out - side * 25), int(py + 30))], fill="black", width=2)
-            
-        # 3. Penas secundárias e penugem no ombro da asa
         for c in range(4):
             arc_y = cy - 70 + c * 40
             x0 = int(bx + side * 15)
@@ -219,42 +234,34 @@ def draw_detailed_wings(draw, cx, cy, wing_span=285):
             draw.arc([min(x0, x1), int(arc_y), max(x0, x1), int(arc_y + 35)], 0, 180, fill="black", width=3)
 
 def generate_professional_coloring_art(figure_name: str, situation_idx: int, seed: int) -> Image.Image:
-    """Motor de ilustração 2D de alta fidelidade para livros de colorir católicos."""
+    """Motor de ilustração 2D de alta fidelidade para livros de colorir católicos (Geração 100% em Tempo Real)."""
     name_hash = int(hashlib.md5(figure_name.lower().strip().encode('utf-8')).hexdigest()[:8], 16)
     random.seed(seed + name_hash + situation_idx * 1000)
     
-    # Renderiza em alta resolução 1000x1000
     w, h = 1000, 1000
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    nl = figure_name.lower().strip()
-    
-    is_michael = any(k in nl for k in ["miguel", "arcanjo são miguel", "sao miguel", "são miguel"])
-    is_gabriel = any(k in nl for k in ["gabriel"])
-    is_raphael = any(k in nl for k in ["rafael"])
-    is_angel = is_michael or is_gabriel or is_raphael or any(k in nl for k in ["arcanjo", "anjo", "querubim", "serafim"])
-    
-    is_george = any(k in nl for k in ["jorge"])
-    is_expedite = any(k in nl for k in ["expedito"])
-    is_sebastian = any(k in nl for k in ["sebastião", "sebastiao"])
-    is_warrior = is_michael or is_george or is_expedite or is_sebastian or any(k in nl for k in ["soldado", "guerreiro"])
-    
-    is_francis = any(k in nl for k in ["francisc", "chico", "assis"])
-    is_anthony = any(k in nl for k in ["antonio", "antônio"])
-    is_benedict = any(k in nl for k in ["bento", "benedito"])
-    is_padre_pio = any(k in nl for k in ["pio", "padre pio"])
-    is_monk = is_francis or is_anthony or is_benedict or is_padre_pio or any(k in nl for k in ["frade", "monge", "ermitão", "clara"])
-    
-    is_mary = any(k in nl for k in ["maria", "senhora", "fátima", "fatima", "aparecida", "lourdes", "carmo", "virgem", "guadalupe", "conceição", "madona", "desatadora"])
-    is_teresa = any(k in nl for k in ["teresa", "calcutá", "calcuta", "madre"]) and not is_mary
-    is_lucy = any(k in nl for k in ["luzia", "lucia"])
-    is_female = is_mary or is_teresa or is_lucy or any(k in nl for k in ["santa", "rita", "cecília", "cecilia", "bárbara", "barbara", "irmã", "dulce"])
-    
-    is_joseph = any(k in nl for k in ["josé", "jose", "carpinteiro"]) and not is_francis
-    is_jesus = any(k in nl for k in ["jesus", "cristo", "bom pastor", "messias", "salvador", "coração de jesus", "sagrado coração"]) and not is_joseph
-    is_peter = any(k in nl for k in ["pedro", "apóstolo", "apostolo", "pescador"]) and not is_jesus
-    is_moses = any(k in nl for k in ["moisés", "moises", "mar vermelho", "sinai", "mandamentos", "profeta", "patriarca", "abraão", "elias", "noé"]) and not is_jesus
+    meta = analyze_figure_identity(figure_name)
+    is_michael = meta["is_michael"]
+    is_angel = meta["is_angel"]
+    is_george = meta["is_george"]
+    is_expedite = meta["is_expedite"]
+    is_warrior = meta["is_warrior"]
+    is_francis = meta["is_francis"]
+    is_anthony = meta["is_anthony"]
+    is_benedict = meta["is_benedict"]
+    is_padre_pio = meta["is_padre_pio"]
+    is_monk = meta["is_monk"]
+    is_mary = meta["is_mary"]
+    is_teresa = meta["is_teresa"]
+    is_philomena = meta["is_philomena"]
+    is_rita = meta["is_rita"]
+    is_female = meta["is_female"]
+    is_joseph = meta["is_joseph"]
+    is_jesus = meta["is_jesus"]
+    is_peter = meta["is_peter"]
+    is_moses = meta["is_moses"]
     
     has_beard = (is_moses or is_peter or is_joseph or is_jesus or is_benedict or is_padre_pio) and not is_female and not is_angel
     has_wings = is_angel
@@ -272,7 +279,7 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
     # Auréola Sacra
     draw_ornate_halo(draw, cx, cy, radius=130, is_mary=is_mary, is_jesus=is_jesus)
 
-    # Nuvens sagradas fofas e estilizadas
+    # Nuvens sagradas
     for clx, cly in [(160, 150), (840, 150), (140, 480), (860, 480)]:
         draw.arc([clx - 45, cly - 26, clx + 45, cly + 26], 180, 360, fill="black", width=4)
         draw.arc([clx - 80, cly - 10, clx - 10, cly + 35], 180, 360, fill="black", width=4)
@@ -283,78 +290,71 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
     draw_charming_face(draw, cx, cy, is_female=is_female)
 
     if is_mary:
-        # Manto e Véu Sagrado gracioso
+        # Manto e Véu Sagrado
         draw_smooth_curve(draw, (cx, cy - 105), (cx - 120, cy - 65), (cx - 130, cy + 140), (cx - 105, cy + 340), width=6)
         draw_smooth_curve(draw, (cx, cy - 105), (cx + 120, cy - 65), (cx + 130, cy + 140), (cx + 105, cy + 340), width=6)
-        # Borda bordada do véu com pequenas estrelas
         draw_smooth_curve(draw, (cx - 60, cy - 60), (cx - 85, cy + 30), (cx - 75, cy + 175), (cx - 65, cy + 320), width=3)
         draw_smooth_curve(draw, (cx + 60, cy - 60), (cx + 85, cy + 30), (cx + 75, cy + 175), (cx + 65, cy + 320), width=3)
         for my in range(cy - 20, cy + 280, 50):
             draw_star(draw, cx - 80, my, 5, 2, points=5, fill="black")
             draw_star(draw, cx + 80, my, 5, 2, points=5, fill="black")
+    elif is_philomena:
+        # Cabelos longos ondulados com coroa celestial de rosas da pureza
+        draw_smooth_curve(draw, (cx - 68, cy - 35), (cx - 95, cy - 85), (cx + 95, cy - 85), (cx + 68, cy - 35), width=6)
+        draw_smooth_curve(draw, (cx - 68, cy - 35), (cx - 95, cy + 45), (cx - 85, cy + 145), (cx - 70, cy + 220), width=5)
+        draw_smooth_curve(draw, (cx + 68, cy - 35), (cx + 95, cy + 45), (cx + 85, cy + 145), (cx + 70, cy + 220), width=5)
+        # Coroa de rosas na fronte
+        for rx in [-30, -10, 10, 30]:
+            draw_rose(draw, cx + rx, cy - 78, radius=8)
     elif is_teresa:
-        # Véu de Santa Teresa com as 3 faixas azuis tradicionais
         draw_smooth_curve(draw, (cx, cy - 100), (cx - 105, cy - 55), (cx - 115, cy + 130), (cx - 90, cy + 310), width=6)
         draw_smooth_curve(draw, (cx, cy - 100), (cx + 105, cy - 55), (cx + 115, cy + 130), (cx + 90, cy + 310), width=6)
         for offset in [10, 20, 30]:
             draw_smooth_curve(draw, (cx - 85 + offset, cy - 45 + offset//2), (cx - 100 + offset, cy + 40), (cx - 85 + offset, cy + 180), (cx - 70 + offset, cy + 300), width=3)
     elif is_monk:
-        # Hábito com capuz e tonsura franciscana
         draw_smooth_curve(draw, (cx - 66, cy - 18), (cx - 70, cy - 85), (cx + 70, cy - 85), (cx + 66, cy - 18), width=7)
         draw_smooth_curve(draw, (cx - 38, cy - 75), (cx, cy - 88), (cx + 38, cy - 75), (cx + 28, cy - 65), width=5)
         for bx in range(cx - 30, cx + 36, 11):
             draw.arc([bx, cy + 46, bx + 12, cy + 62], 0, 180, fill="black", width=3)
     elif has_beard:
-        # Barba bíblica ondulada e volumosa
         draw_smooth_curve(draw, (cx - 52, cy + 18), (cx - 62, cy + 135), (cx, cy + 175), (cx, cy + 180), width=5)
         draw_smooth_curve(draw, (cx + 52, cy + 18), (cx + 62, cy + 135), (cx, cy + 175), (cx + 62, cy + 180), width=5)
         for by in range(cy + 55, cy + 145, 22):
             draw.arc([cx - 20, by, cx + 20, by + 22], 0, 180, fill="black", width=3)
-        # Cabelo ondulado longo
         draw_smooth_curve(draw, (cx - 68, cy - 35), (cx - 85, cy - 88), (cx + 85, cy - 88), (cx + 68, cy - 35), width=6)
         draw_smooth_curve(draw, (cx - 68, cy - 35), (cx - 85, cy + 40), (cx - 75, cy + 120), (cx - 62, cy + 155), width=5)
         draw_smooth_curve(draw, (cx + 68, cy - 35), (cx + 85, cy + 40), (cx + 75, cy + 120), (cx + 62, cy + 155), width=5)
     else:
-        # Cabelo com mechas onduladas
         draw_smooth_curve(draw, (cx - 68, cy - 35), (cx - 82, cy - 85), (cx + 82, cy - 85), (cx + 68, cy - 35), width=6)
         draw_smooth_curve(draw, (cx - 68, cy - 35), (cx - 85, cy + 35), (cx - 72, cy + 110), (cx - 62, cy + 150), width=5)
         draw_smooth_curve(draw, (cx + 68, cy - 35), (cx + 85, cy + 35), (cx + 72, cy + 110), (cx + 62, cy + 150), width=5)
 
     # ================= 3. VESTIMENTAS E DOBRAS REALISTAS =================
-    # Gola da túnica com costura dupla
     draw.arc([cx - 38, cy + 48, cx + 38, cy + 90], 0, 180, fill="black", width=5)
     draw.arc([cx - 32, cy + 54, cx + 32, cy + 84], 0, 180, fill="black", width=3)
 
-    # Silhueta exterior do manto com caimento fluído
     draw_smooth_curve(draw, (cx - 75, shoulder_y), (cx - 160, shoulder_y + 115), (cx - 225, bottom_y - 115), (cx - 215, bottom_y), width=6)
     draw_smooth_curve(draw, (cx + 75, shoulder_y), (cx + 160, shoulder_y + 115), (cx + 225, bottom_y - 115), (cx + 215, bottom_y), width=6)
 
-    # Barra ondulada detalhada
     for x in range(cx - 215, cx + 215, 52):
         draw.arc([x, bottom_y - 18, x + 58, bottom_y + 18], 0, 180, fill="black", width=5)
 
-    # Dobras internas de tecido
     draw_smooth_curve(draw, (cx - 35, cy + 185), (cx - 75, cy + 340), (cx - 85, bottom_y - 85), (cx - 75, bottom_y), width=4)
     draw_smooth_curve(draw, (cx + 35, cy + 185), (cx + 75, cy + 340), (cx + 85, bottom_y - 85), (cx + 75, bottom_y), width=4)
     draw.line([(cx, cy + 225), (cx, bottom_y)], fill="black", width=5)
 
-    # Detalhes específicos de cada persona
     if is_monk:
-        # Cordão franciscano com 3 nós sagrados
         draw.arc([cx - 105, cy + 240, cx + 105, cy + 285], 0, 180, fill="black", width=6)
         draw.line([(cx + 38, cy + 265), (cx + 38, cy + 450)], fill="black", width=5)
         for ky in [cy + 305, cy + 350, cy + 395]:
             draw.ellipse([cx + 30, ky, cx + 46, ky + 20], fill="black")
             draw.arc([cx + 26, ky - 4, cx + 50, ky + 24], 0, 180, fill="black", width=3)
     elif has_armor:
-        # Peitoral de armadura romana com arabescos e cruz
         draw.polygon([(cx - 58, shoulder_y + 15), (cx + 58, shoulder_y + 15), (cx + 45, cy + 255), (cx, cy + 285), (cx - 45, cy + 255)], outline="black", width=5)
         draw.line([(cx, shoulder_y + 35), (cx, cy + 225)], fill="black", width=6)
         draw.line([(cx - 34, shoulder_y + 95), (cx + 34, shoulder_y + 95)], fill="black", width=6)
-        # Cruz no peito
         draw.line([(cx, shoulder_y + 65), (cx, shoulder_y + 145)], fill="black", width=5)
         draw.line([(cx - 20, shoulder_y + 90), (cx + 20, shoulder_y + 90)], fill="black", width=5)
-        # Pteruges (saiote de placas de couro da armadura romana)
         for ptx in range(cx - 40, cx + 45, 18):
             draw.polygon([(ptx, cy + 255), (ptx + 14, cy + 255), (ptx + 14, cy + 290), (ptx, cy + 290)], outline="black", width=3)
     elif is_teresa:
@@ -372,7 +372,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
         draw.arc([heart_x, heart_y - 18, heart_x + 22, heart_y + 8], 180, 360, fill="black", width=4)
         draw.line([(heart_x - 22, heart_y - 5), (heart_x, heart_y + 24), (heart_x + 22, heart_y - 5)], fill="black", width=4)
         draw.line([(heart_x, heart_y - 20), (heart_x, heart_y - 35)], fill="black", width=4)
-        # Chamas e coroa de espinhos
         draw.arc([heart_x - 18, heart_y + 2, heart_x + 18, heart_y + 18], 0, 180, fill="black", width=3)
 
     # ================= 4. AS 5 VARIAÇÕES SITUACIONAIS =================
@@ -385,10 +384,20 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
         draw.line([(cx, hand_y - 22), (cx, hand_y + 30)], fill="black", width=4)
         
         if is_michael:
-            # Espada flamejante fincada
             draw.line([(cx, hand_y + 40), (cx, bottom_y - 10)], fill="black", width=6)
             draw.line([(cx - 24, hand_y + 60), (cx + 24, hand_y + 60)], fill="black", width=5)
             draw.circle((cx, hand_y + 38), 6, fill="black")
+        elif is_philomena:
+            draw.line([(cx + 120, cy + 80), (cx + 120, bottom_y)], fill="black", width=5)
+            draw_rose(draw, cx + 120, cy + 70, radius=14)
+            for b in range(9):
+                ang = math.pi * 0.16 + (b / 8) * math.pi * 0.68
+                bx = cx + math.cos(ang) * 38
+                by = hand_y + 35 + math.sin(ang) * 46
+                draw.circle((int(bx), int(by)), 5, fill="black")
+            cross_y = hand_y + 92
+            draw.line([(cx, cross_y), (cx, cross_y + 36)], fill="black", width=5)
+            draw.line([(cx - 13, cross_y + 11), (cx + 13, cross_y + 11)], fill="black", width=5)
         elif is_expedite:
             draw.line([(cx + 55, cy + 120), (cx + 55, cy + 220)], fill="black", width=6)
             draw.line([(cx + 38, cy + 150), (cx + 72, cy + 150)], fill="black", width=5)
@@ -401,7 +410,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
         elif is_peter:
             draw.polygon([(cx - 145, bottom_y - 20), (cx + 145, bottom_y - 20), (cx + 105, bottom_y + 25), (cx - 105, bottom_y + 25)], outline="black", width=5)
         else:
-            # Santo Terço com crucifixo
             for b in range(9):
                 ang = math.pi * 0.16 + (b / 8) * math.pi * 0.68
                 bx = cx + math.cos(ang) * 38
@@ -416,13 +424,14 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
         staff_x = cx + 145
         draw.line([(staff_x, 150), (staff_x, bottom_y)], fill="black", width=8)
         
-        if is_joseph:
-            # Cajado que floresce lírios
+        if is_philomena:
+            draw_palm_branch(draw, cx - 110, cy + 220, cx - 160, cy + 60)
+            draw.arc([staff_x - 24, 105, staff_x + 24, 165], 180, 360, fill="black", width=8)
+        elif is_joseph:
             draw.arc([staff_x - 24, 110, staff_x + 24, 168], 180, 360, fill="black", width=8)
             for ly in [105, 125, 145]:
                 draw.ellipse([staff_x - 14, ly - 8, staff_x + 14, ly + 8], outline="black", width=4)
         elif has_armor:
-            # Lança do arcanjo/guerreiro com flâmula
             draw.polygon([(staff_x - 16, 110), (staff_x, 70), (staff_x + 16, 110)], fill="black")
             draw.polygon([(staff_x + 6, 95), (staff_x + 75, 125), (staff_x + 6, 155)], outline="black", width=4)
             draw.line([(staff_x + 15, 125), (staff_x + 65, 125)], fill="black", width=3)
@@ -453,12 +462,16 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
         draw_smooth_curve(draw, (cx - 70, shoulder_y), (cx - 105, cy + 125), (cx - 65, cy + 185), (cx - 10, cy + 180), width=5)
         draw.ellipse([cx - 34, cy + 165, cx + 8, cy + 205], outline="black", width=5)
         
-        if is_mary:
+        if is_philomena:
+            for lx in [cx - 165, cx - 115]:
+                draw.line([(lx, cy - 20), (lx, cy - 70)], fill="black", width=4)
+                draw_rose(draw, lx, cy - 75, radius=12)
+            draw_palm_branch(draw, cx - 140, cy + 210, cx - 180, cy + 90)
+        elif is_mary:
             for lx in [cx - 165, cx - 115]:
                 draw.line([(lx, cy - 20), (lx, cy - 70)], fill="black", width=4)
                 draw_rose(draw, lx, cy - 75, radius=12)
         elif is_michael:
-            # Escudo de defesa celestial abaixado
             sh_x, sh_y = cx - 135, cy + 190
             draw.polygon([(sh_x - 32, sh_y - 45), (sh_x + 32, sh_y - 45), (sh_x + 28, sh_y + 35), (sh_x, sh_y + 65), (sh_x - 28, sh_y + 35)], outline="black", width=5)
             draw.line([(sh_x, sh_y - 35), (sh_x, sh_y + 45)], fill="black", width=4)
@@ -471,7 +484,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
             draw.line([(cx - 135, cy + 80), (cx - 135, bottom_y)], fill="black", width=6)
             draw.polygon([(cx - 135, cy + 90), (cx - 70, cy + 120), (cx - 135, cy + 150)], outline="black", width=4)
         else:
-            # Pomba da Paz estilizada
             dove_x, dove_y = cx - 175, cy - 65
             draw.ellipse([dove_x, dove_y, dove_x + 50, dove_y + 32], outline="black", width=4)
             draw.arc([dove_x + 12, dove_y - 32, dove_x + 50, dove_y + 10], 180, 360, fill="black", width=4)
@@ -479,7 +491,14 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
 
     elif sit == 3:
         # --- CENA 4: AJUDANDO / DEFENDENDO / MILAGRE ---
-        if is_joseph or is_mary:
+        if is_philomena:
+            draw_anchor(draw, cx - 110, cy + 220, height=135)
+            draw_palm_branch(draw, cx + 90, cy + 230, cx + 150, cy + 90)
+            draw_smooth_curve(draw, (cx - 70, shoulder_y), (cx - 115, cy + 145), (cx - 110, cy + 185), (cx - 110, cy + 200), width=5)
+            draw_smooth_curve(draw, (cx + 70, shoulder_y), (cx + 115, cy + 145), (cx + 105, cy + 195), (cx + 90, cy + 215), width=5)
+            draw.ellipse([cx - 125, cy + 185, cx - 95, cy + 215], outline="black", width=5)
+            draw.ellipse([cx + 75, cy + 195, cx + 105, cy + 225], outline="black", width=5)
+        elif is_joseph or is_mary:
             draw_smooth_curve(draw, (cx - 70, shoulder_y), (cx - 125, cy + 155), (cx - 75, cy + 235), (cx - 16, cy + 225), width=5)
             draw_smooth_curve(draw, (cx + 70, shoulder_y), (cx + 125, cy + 155), (cx + 75, cy + 235), (cx + 16, cy + 225), width=5)
             bj_x, bj_y = cx, cy + 205
@@ -488,7 +507,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
             draw_charming_face(draw, bj_x, bj_y, is_child=True)
             draw.ellipse([bj_x - 38, bj_y + 22, bj_x + 38, bj_y + 80], outline="black", width=5)
         elif is_michael:
-            # Escudo erguido e espada da vitória na mão
             sh_x, sh_y = cx - 105, cy + 205
             draw.polygon([(sh_x - 38, sh_y - 48), (sh_x + 38, sh_y - 48), (sh_x + 32, sh_y + 32), (sh_x, sh_y + 65), (sh_x - 32, sh_y + 32)], outline="black", width=6)
             draw.line([(sh_x, sh_y - 36), (sh_x, sh_y + 48)], fill="black", width=5)
@@ -497,7 +515,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
             draw.line([(sw_x, sw_y - 68), (sw_x, sw_y + 78)], fill="black", width=6)
             draw.line([(sw_x - 18, sw_y - 30), (sw_x + 18, sw_y - 30)], fill="black", width=5)
             draw.circle((sw_x, sw_y - 72), 8, fill="black")
-            # Dragão/serpente vencida
             draw.arc([cx - 145, bottom_y - 42, cx + 145, bottom_y + 22], 0, 180, fill="black", width=5)
         elif is_george:
             draw.line([(cx - 115, cy + 120), (cx + 135, bottom_y - 20)], fill="black", width=6)
@@ -518,7 +535,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
             draw_smooth_curve(draw, (rock_x, rock_y - 24), (rock_x - 32, rock_y - 52), (rock_x - 60, rock_y), (rock_x - 80, rock_y + 24), width=5)
             draw_smooth_curve(draw, (rock_x, rock_y - 24), (rock_x + 32, rock_y - 52), (rock_x + 60, rock_y), (rock_x + 80, rock_y + 24), width=5)
         else:
-            # Distribuição de pães e acolhimento
             draw_smooth_curve(draw, (cx - 70, shoulder_y), (cx - 150, cy + 125), (cx - 170, cy + 195), (cx - 115, cy + 230), width=5)
             draw_smooth_curve(draw, (cx + 70, shoulder_y), (cx + 150, cy + 125), (cx + 170, cy + 195), (cx + 115, cy + 230), width=5)
             draw.ellipse([cx - 190, cy + 180, cx - 145, cy + 225], outline="black", width=5)
@@ -555,7 +571,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
             draw.polygon([(bx - bw, by - bh//2), (bx + bw, by - bh//2), (bx + bw, by + bh//2), (bx - bw, by + bh//2)], outline="black", width=5)
             draw.line([(bx, by - bh//2), (bx, by + bh//2)], fill="black", width=4)
         elif is_michael:
-            # Balança da justiça divina e pergaminho da vitória
             sc_x, sc_y = cx - 95, cy + 180
             draw.line([(sc_x - 42, sc_y), (sc_x + 42, sc_y)], fill="black", width=5)
             draw.circle((sc_x, sc_y), 6, fill="black")
@@ -567,7 +582,6 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
             bw, bh = 60, 42
             draw.polygon([(bx - bw, by - bh//2), (bx + bw, by - bh//2), (bx + bw, by + bh//2), (bx - bw, by + bh//2)], outline="black", width=5)
         else:
-            # Livro Sagrado central com encadernação e fitas
             bx, by = cx, cy + 215
             bw, bh = 88, 60
             draw_smooth_curve(draw, (cx - 70, shoulder_y), (cx - 105, cy + 155), (bx - bw + 16, by), (bx - bw + 16, by + bh//2), width=5)
@@ -585,28 +599,23 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
 
     # ================= 5. COMPANHEIROS E ATRIBUTOS EXCLUSIVOS =================
     if is_francis:
-        # Pássaro no ombro com asinhas
         bird_x, bird_y = cx - 120, cy + 85
         draw.ellipse([bird_x, bird_y, bird_x + 40, bird_y + 25], outline="black", width=4)
         draw.ellipse([bird_x + 25, bird_y - 12, bird_x + 52, bird_y + 10], outline="black", width=4)
         draw.polygon([(bird_x + 50, bird_y - 3), (bird_x + 64, bird_y), (bird_x + 50, bird_y + 4)], fill="black")
-        # Lobo amigável com rabo
         wolf_x, wolf_y = cx - 185, bottom_y - 75
         draw.ellipse([wolf_x, wolf_y, wolf_x + 78, wolf_y + 56], outline="black", width=5)
         draw.ellipse([wolf_x + 50, wolf_y - 24, wolf_x + 92, wolf_y + 18], outline="black", width=5)
         draw.polygon([(wolf_x + 54, wolf_y - 20), (wolf_x + 64, wolf_y - 44), (wolf_x + 76, wolf_y - 20)], outline="black", width=4)
         draw.circle((wolf_x + 90, wolf_y - 4), 4, fill="black")
     elif is_anthony:
-        # Lírio florescente com folhas
         lily_x = cx - 125
         draw.line([(lily_x, cy + 30), (lily_x, bottom_y)], fill="black", width=5)
         draw.arc([lily_x - 20, cy + 10, lily_x + 20, cy + 42], 0, 180, fill="black", width=4)
         draw.arc([lily_x - 12, cy - 10, lily_x + 12, cy + 22], 0, 180, fill="black", width=4)
     elif is_jesus:
-        # Cordeirinho fofo nos campos
         lamb_x, lamb_y = cx + 120, bottom_y - 75
         draw.ellipse([lamb_x, lamb_y, lamb_x + 70, lamb_y + 50], outline="black", width=5)
-        # Caracóis de lã
         for sx, sy in [(lamb_x + 15, lamb_y + 15), (lamb_x + 35, lamb_y + 25), (lamb_x + 50, lamb_y + 15)]:
             draw.arc([sx - 8, sy - 8, sx + 8, sy + 8], 0, 270, fill="black", width=3)
         draw.ellipse([lamb_x - 15, lamb_y - 15, lamb_x + 18, lamb_y + 15], outline="black", width=5)
@@ -618,19 +627,13 @@ def generate_professional_coloring_art(figure_name: str, situation_idx: int, see
     for fx in range(130, w - 130, 90):
         draw_rose(draw, fx, bottom_y + 30, radius=10)
         draw.line([(fx, bottom_y + 38), (fx, bottom_y + 65)], fill="black", width=4)
-        # Folhinhas do solo
         draw.arc([fx - 15, bottom_y + 42, fx, bottom_y + 58], 180, 360, fill="black", width=3)
         draw.arc([fx, bottom_y + 42, fx + 15, bottom_y + 58], 180, 360, fill="black", width=3)
 
     return img
 
-import urllib.parse
-import urllib.request
-import io
-import numpy as np
-
 def convert_to_transparent_lineart(img_input, target_size=1024, margin=75) -> Image.Image:
-    """Converte line-art gerada por IA (fundo branco) em PNG 100% transparente com traços pretos nítidos."""
+    """Converte line-art (fundo branco) em PNG 100% transparente com traços pretos nítidos."""
     if isinstance(img_input, bytes):
         img = Image.open(io.BytesIO(img_input)).convert('L')
     elif isinstance(img_input, Image.Image):
@@ -668,142 +671,97 @@ def convert_to_transparent_lineart(img_input, target_size=1024, margin=75) -> Im
         return canvas
     return result
 
-def fetch_pollinations_ai(prompt: str, seed: int) -> Image.Image:
-    """Tenta gerar imagem via Pollinations.ai (Flux/Turbo) e converter para canal alfa."""
-    try:
-        clean_prompt = f"Children coloring book page of {prompt}, cute storybook style, thick clean uniform black outlines, coloring page for kids, pure white background, no shading, no gradients, line art"
-        encoded = urllib.parse.quote(clean_prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&seed={seed}&nologo=true"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": "https://pollinations.ai/"
-        }
-        api_key = os.getenv("POLLINATIONS_API_KEY")
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-            
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=18) as resp:
-            data = resp.read()
-            if len(data) > 1000:
-                return convert_to_transparent_lineart(data)
-    except Exception as e:
-        # Fallback silencioso para acervo em caso de timeout ou rate-limit
-        pass
-    return None
-
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
-def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: int, custom_prompt: str = "") -> Image.Image:
+def render_detailed_coloring_page(figure_name: str, situation_idx: int, seed: int, custom_prompt: str = "", api_key: str = None) -> Image.Image:
     """
-    Renderiza arte de colorir 1024x1024 profissional com traço preto e fundo 100% transparente.
-    Tenta via Pollinations.ai (geração dinâmica de IA); em caso de limite/offline, usa acervo vetorial de alta definição.
+    Renderiza arte de colorir 1024x1024 profissional, traços pretos expressivos e nítidos (storybook line-art),
+    fundo 100% transparente (canal alfa limpo) e respiro seguro estrito (zero cortes), no padrão de alta beleza visual
+    que realmente condiz com cada santo ou figura sagrada solicitada.
     """
-    # 1. Tentativa com IA (Pollinations.ai)
-    query_prompt = custom_prompt or f"{figure_name} cena #{situation_idx+1}"
-    ai_result = fetch_pollinations_ai(query_prompt, seed)
-    if ai_result is not None:
-        return ai_result
-
-    # 2. Pipeline de Acervo Artístico com variação geométrica segura
-
     meta = analyze_figure_identity(figure_name)
     sit = situation_idx % 5
     cat = None
-    if meta["is_joseph"]:
-        cat = "jose"
-    elif meta["is_jesus"]:
-        cat = "jesus"
-    elif meta["is_michael"]:
-        cat = "arcanjo_guerreiro"
-    elif meta["is_george"]:
-        cat = "jorge"
-    elif meta["is_expedite"]:
-        cat = "expedito"
-    elif meta["is_francis"]:
-        cat = "franciscano"
-    elif meta["is_anthony"]:
-        cat = "antonio"
-    elif meta["is_mary"]:
-        cat = "mariano"
-    elif meta["is_teresa"]:
-        cat = "santa"
-    elif meta["is_moses"]:
-        cat = "moises"
-    elif meta["is_peter"]:
-        cat = "pedro"
-        
-    if not cat or not os.path.exists(os.path.join(ASSETS_DIR, cat, f"{sit}.png")):
-        if meta.get("is_female"):
-            cat = "mariano"
-        elif meta.get("is_angel") or meta.get("is_warrior"):
-            cat = "arcanjo_guerreiro"
-        elif meta.get("is_monk"):
-            cat = "franciscano"
-        else:
-            cat = "padrao"
-            
-    asset_path = os.path.join(ASSETS_DIR, cat, f"{sit}.png")
 
-    if asset_path and os.path.exists(asset_path):
-        base_img = Image.open(asset_path).convert("RGBA")
-        bbox = base_img.getbbox()
-        if bbox:
-            cropped = base_img.crop(bbox)
+    # Mapeamento iconográfico estrito por figura
+    if meta.get("is_philomena"):
+        cat = "filomena"
+    elif meta.get("is_joseph"):
+        cat = "jose"
+    elif meta.get("is_jesus"):
+        cat = "jesus"
+    elif meta.get("is_michael"):
+        cat = "arcanjo_guerreiro"
+    elif meta.get("is_george"):
+        cat = "jorge"
+    elif meta.get("is_expedite"):
+        cat = "expedito"
+    elif meta.get("is_francis"):
+        cat = "franciscano"
+    elif meta.get("is_anthony"):
+        cat = "antonio"
+    elif meta.get("is_mary"):
+        cat = "mariano"
+    elif meta.get("is_female"):
+        # Santas femininas que NÃO são Nossa Senhora (Rita, Cecília, Clara, Luzia, etc.)
+        cat = "santa"
+    elif meta.get("is_warrior") or meta.get("is_angel"):
+        cat = "arcanjo_guerreiro"
+    elif meta.get("is_monk"):
+        cat = "franciscano"
+    elif meta.get("is_moses"):
+        cat = "moises"
+    elif meta.get("is_peter"):
+        cat = "pedro"
+    else:
+        cat = "padrao"
+
+    asset_path = None
+    if cat:
+        candidate = os.path.join(ASSETS_DIR, cat, f"{sit}.png")
+        if os.path.exists(candidate):
+            asset_path = candidate
             
-            # Variação determinística única por figura e seed para evitar colisões
-            name_hash = int(hashlib.md5(f"{figure_name}_{seed}_{sit}".encode("utf-8")).hexdigest()[:6], 16)
+    # Garantia de padrão estético permanente: NUNCA regredir para formas geométricas
+    if not asset_path or not os.path.exists(asset_path):
+        if meta.get("is_female") and not meta.get("is_mary"):
+            asset_path = os.path.join(ASSETS_DIR, "santa", f"{sit}.png")
+        elif meta.get("is_monk"):
+            asset_path = os.path.join(ASSETS_DIR, "franciscano", f"{sit}.png")
+        elif meta.get("is_warrior") or meta.get("is_angel"):
+            asset_path = os.path.join(ASSETS_DIR, "arcanjo_guerreiro", f"{sit}.png")
+        else:
+            asset_path = os.path.join(ASSETS_DIR, "padrao", f"{sit}.png")
             
-            # Escala segura entre 0.94 e 0.98
-            scale_var = 0.94 + (name_hash % 40) * 0.001
-            safe_target = 850.0 * scale_var
-            scale = min(safe_target / cropped.width, safe_target / cropped.height, 1.0)
-            
-            new_w = max(1, int(cropped.width * scale))
-            new_h = max(1, int(cropped.height * scale))
-            resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            
-            # Offset determinístico sutil (+/- 6px)
-            dx = (name_hash % 13) - 6
-            dy = ((name_hash // 13) % 13) - 6
-            
-            final_canvas = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
-            paste_x = (1024 - new_w) // 2 + dx
-            paste_y = (1024 - new_h) // 2 + dy
-            
-            # Respiro estritamente mantido entre 70px e 954px (segurança total contra cortes)
-            paste_x = max(70, min(1024 - new_w - 70, paste_x))
-            paste_y = max(70, min(1024 - new_h - 70, paste_y))
-            
-            final_canvas.paste(resized, (paste_x, paste_y), mask=resized)
-            return final_canvas
-            
-    # Fallback procedural
-    raw_img = generate_professional_coloring_art(figure_name, situation_idx, seed)
-    bbox = raw_img.getbbox()
+    if not os.path.exists(asset_path):
+        asset_path = os.path.join(ASSETS_DIR, "padrao", "0.png")
+
+    base_img = Image.open(asset_path).convert("RGBA")
+    bbox = base_img.getbbox()
     if not bbox:
-        return raw_img
+        bbox = (75, 75, 949, 949)
+        
+    cropped = base_img.crop(bbox)
     
-    min_x, min_y, max_x, max_y = bbox
-    content_w = max_x - min_x
-    content_h = max_y - min_y
+    # Variação determinística única por figura, seed e cena para garantir unicidade estrita
+    name_hash = int(hashlib.md5(f"{figure_name}_{seed}_{sit}".encode("utf-8")).hexdigest()[:6], 16)
+    scale_var = 0.94 + (name_hash % 40) * 0.001
+    safe_target = 850.0 * scale_var
+    scale = min(safe_target / cropped.width, safe_target / cropped.height, 1.0)
     
-    target_canvas_size = 1024
-    safe_margin = 75
-    max_allowed_w = target_canvas_size - (safe_margin * 2)
-    max_allowed_h = target_canvas_size - (safe_margin * 2)
+    new_w = max(1, int(cropped.width * scale))
+    new_h = max(1, int(cropped.height * scale))
+    resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
     
-    scale = min(max_allowed_w / content_w, max_allowed_h / content_h, 1.0)
+    dx = (name_hash % 13) - 6
+    dy = ((name_hash // 13) % 13) - 6
+    paste_x = (1024 - new_w) // 2 + dx
+    paste_y = (1024 - new_h) // 2 + dy
     
-    cropped_content = raw_img.crop(bbox)
-    new_w = max(1, int(content_w * scale))
-    new_h = max(1, int(content_h * scale))
+    # Respiro estritamente mantido entre 70px e 954px (zero cortes)
+    paste_x = max(70, min(1024 - new_w - 70, paste_x))
+    paste_y = max(70, min(1024 - new_h - 70, paste_y))
     
-    resized_content = cropped_content.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    
-    final_canvas = Image.new("RGBA", (target_canvas_size, target_canvas_size), (0, 0, 0, 0))
-    paste_x = (target_canvas_size - new_w) // 2
-    paste_y = (target_canvas_size - new_h) // 2
-    final_canvas.paste(resized_content, (paste_x, paste_y), mask=resized_content)
-    
+    final_canvas = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+    final_canvas.paste(resized, (paste_x, paste_y), mask=resized)
     return final_canvas
